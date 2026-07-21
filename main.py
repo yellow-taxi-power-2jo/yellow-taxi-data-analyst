@@ -1,6 +1,6 @@
 #====================================================================
-# 작성자: 김용찬, 김아영
-# 작성목적: 데이터 준비 파이프라인 자동 실행 및 로깅 스크립트
+# 작성자: 김용찬, 김아영, 오영현
+# 작성목적: 데이터 준비 + 시각화 + 통계 분석 파이프라인 자동 실행 및 로깅 스크립트
 # Seaborn 정적 차트, Plotly 인터랙티브 차트 생성
 #====================================================================
 
@@ -12,6 +12,10 @@ from src.visualization import (
     create_plotly_distance_chart,
     create_seaborn_hourly_chart,
     prepare_visualization_data,
+)
+from src.analysis import (
+    compute_descriptive_stats,
+    compute_correlation_matrix,
 )
 
 def setup_logger():
@@ -34,7 +38,7 @@ def setup_logger():
     return logging.getLogger(__name__)
 
 # 파일 경로 설정 (상대 경로)
-RAW_DATA_PATH = os.path.join('data', 'yellow_tripdata_2026-05.parquet')
+RAW_DATA_PATH = os.path.join('data', 'raw', 'yellow_tripdata_2026-05.parquet')
 PROCESSED_DATA_PATH = os.path.join('data', 'processed', 'cleaned_taxi_data.parquet')
 
 def main():
@@ -76,6 +80,10 @@ def main():
         logger.info(
             f"✅ Plotly 인터랙티브 차트 저장 위치: '{plotly_output_path}'"
         )
+
+        # 8. 기술통계 및 상관계수 계산
+        compute_descriptive_stats(df_cleaned)
+        compute_correlation_matrix(df_cleaned)
         
     except Exception as e:
         logger.error(f"❌ [파이프라인 오류 발생]: {e}", exc_info=True)
