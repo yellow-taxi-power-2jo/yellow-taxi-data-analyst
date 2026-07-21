@@ -11,6 +11,7 @@
 #====================================================================
 
 import logging
+import random
 
 import pandas as pd
 from scipy import stats
@@ -86,6 +87,16 @@ PAYMENT_CASH = 2
 # 유의수준(귀무가설을 기각할지 판단하는 기준값)
 ALPHA = 0.05
 
+# [표본 크기별 p-value 실험] 설정
+#   같은 두 집단(신용카드 vs 현금)에서 표본 크기(n)만 10 → 100 → 1000 …으로 늘려가며
+#   p-value가 어떻게 변하는지 관찰하기 위한 값들이다.
+#   '평균 차이(효과크기)'는 그대로인데도 n이 커지면 p-value가 급격히 작아지는 것을 보여준다.
+SAMPLE_SIZES = [10, 100, 1000, 10000, 100000]
+# 각 표본 크기마다 무작위 추출을 몇 번 반복해 평균을 낼지 (우연에 덜 흔들리도록).
+N_REPEATS = 10
+# 무작위 추출 재현성을 위한 시드
+RANDOM_SEED = 42
+
 
 def run_payment_type_ttest(df: pd.DataFrame, value_column: str = "total_amount"):
     """
@@ -124,16 +135,71 @@ def run_payment_type_ttest(df: pd.DataFrame, value_column: str = "total_amount")
     t_stat, p_value = stats.ttest_ind(card, cash, equal_var=False, nan_policy="omit")
 
     logger.info(f"▶ t-통계량(t-statistic): {t_stat:.4f}")
-    logger.info(f"▶ p-value: {p_value:.6g}")
+    logger.info(f"▶ p-value: {p_value:.6f}")
 
     # p-value 해석: 유의수준(ALPHA)과 비교해 귀무가설 기각 여부를 문장으로 남긴다.
     if p_value < ALPHA:
         higher = "신용카드" if card.mean() > cash.mean() else "현금"
-        logger.info(f"💡 결론: p-value({p_value:.4g}) < α({ALPHA}) → 귀무가설 기각")
+        logger.info(f"💡 결론: p-value({p_value:.6f}) < α({ALPHA}) → 귀무가설 기각")
         logger.info("   두 결제수단의 평균 총요금은 '통계적으로 유의미한 차이'가 있다.")
         logger.info(f"   → 평균적으로 '{higher}' 결제 트립의 총요금이 더 높다.")
     else:
-        logger.info(f"💡 결론: p-value({p_value:.4g}) ≥ α({ALPHA}) → 귀무가설 기각 실패")
+        logger.info(f"💡 결론: p-value({p_value:.6f}) ≥ α({ALPHA}) → 귀무가설 기각 실패")
         logger.info("   두 결제수단의 평균 총요금 차이는 '통계적으로 유의하지 않다'.")
 
+    # p-value 해석의 연장선: 표본 크기(n)를 늘려가며 p-value가 어떻게 변하는지 실험한다.
+    run_sample_size_experiment(card, cash)
+
     return t_stat, p_value
+
+
+def run_sample_size_experiment(card: pd.Series, cash: pd.Series):
+    """
+    [함수 설명] 같은 두 집단에서 표본 크기(n)만 10 → 100 → 1000 …으로 늘려가며
+    평균 p-value가 어떻게 변하는지 보여주는 실험이다.
+
+    핵심 메시지: 두 집단의 '실제 평균 차이(효과크기)'는 변하지 않는데도,
+    표본이 커질수록 p-value는 급격히 작아진다. 즉 전체 데이터(수백만 건)에서
+    p-value가 0.0000으로 나오는 것은 버그가 아니라 '큰 표본의 자연스러운 결과'다.
+
+    각 표본 크기마다 무작위 추출을 N_REPEATS번 반복해 p-value의 평균을 내고,
+    p < ALPHA(유의)로 나온 비율도 함께 보여준다.
+    """
+    logger.info("=" * 60)
+    logger.info(" [9-1] 표본 크기별 p-value 변화 실험")
+    logger.info("=" * 60)
+    logger.info("   같은 두 집단에서 표본 크기(n)만 늘려가며 p-value를 관찰한다.")
+    logger.info("   (평균 차이는 그대로여도 n이 커지면 p-value가 작아지는지 확인)")
+
+    rng = random.Random(RANDOM_SEED)
+    # 표頭
+    logger.info(f"   {'표본크기 n':>10} | {'평균 p-value':>14} | {'유의(p<0.05) 비율':>16} | {'평균 t':>10}")
+    logger.info(f"   {'-'*10} | {'-'*14} | {'-'*16} | {'-'*10}")
+
+    for n in SAMPLE_SIZES:
+        # 두 그룹 중 더 작은 쪽보다 큰 표본은 뽑을 수 없으므로 건너뛴다.
+        if n > len(card) or n > len(cash):
+            logger.info(f"   {n:>10,} | (표본 수 부족으로 건너뜀)")
+            continue
+
+        p_values = []
+        t_stats = []
+        n_significant = 0
+        for _ in range(N_REPEATS):
+            # 각 그룹에서 서로 다른 시드로 n개씩 무작위 추출
+            card_sample = card.sample(n=n, random_state=rng.randint(0, 2**31 - 1))
+            cash_sample = cash.sample(n=n, random_state=rng.randint(0, 2**31 - 1))
+            t_stat, p_value = stats.ttest_ind(card_sample, cash_sample, equal_var=False)
+            p_values.append(p_value)
+            t_stats.append(t_stat)
+            if p_value < ALPHA:
+                n_significant += 1
+
+        avg_p = sum(p_values) / len(p_values)
+        avg_t = sum(t_stats) / len(t_stats)
+        sig_ratio = n_significant / N_REPEATS
+        logger.info(f"   {n:>10,} | {avg_p:>14.6f} | {sig_ratio:>15.0%} | {avg_t:>10.2f}")
+
+    logger.info("💡 해석: 두 집단의 실제 평균 차이는 그대로인데도, 표본 n이 커질수록")
+    logger.info("   p-value는 0에 수렴하고 '유의' 판정 비율은 100%에 가까워진다.")
+    logger.info("   → 전체 데이터의 p-value=0.0000은 오류가 아니라 '큰 표본'의 당연한 결과다.")
