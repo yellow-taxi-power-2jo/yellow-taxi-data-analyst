@@ -1,18 +1,18 @@
-# [1] 데이터 준비 담당 파트 필수 패키지
-pandas>=2.0.0
-polars>=0.20.0
-pyarrow>=14.0.0    # ★ Parquet 파일을 읽기 위해 반드시 필요한 엔진
-
-# [2] 주피터 노트북 실행 환경
-notebook>=7.0.0
-ipykernel>=6.0.0
-
-# [3] 시각화 담당 파트 필수 패키지
-matplotlib>=3.8.0
-seaborn>=0.13.0
-plotly>=5.18.0
-
-# [4] 통계 분석 및 ML Pipeline 담당 파트 필수 패키지
-scipy>=1.11.0
-scikit-learn>=1.3.0
-joblib>=1.3.0
+contourpy==1.3.3
+cycler==0.12.1
+fonttools==4.63.0
+kiwisolver==1.5.0
+matplotlib==3.11.1
+narwhals==2.24.0
+numpy==2.4.6
+packaging==26.2
+pandas==3.0.3
+pillow==12.3.0
+plotly==6.9.0
+polars==1.43.0
+polars-runtime-32==1.43.0
+pyarrow==25.0.0
+pyparsing==3.3.2
+python-dateutil==2.9.0.post0
+seaborn==0.13.2
+six==1.17.0
