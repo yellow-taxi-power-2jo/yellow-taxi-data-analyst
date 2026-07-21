@@ -8,4 +8,6 @@ coverage.xml
 htmlcov/
 .DS_Store
 data/
+
 logs/
+*.log

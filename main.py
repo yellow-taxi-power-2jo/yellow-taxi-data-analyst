@@ -1,12 +1,18 @@
 #====================================================================
-# 작성자: 김용찬
+# 작성자: 김용찬, 김아영
 # 작성목적: 데이터 준비 파이프라인 자동 실행 및 로깅 스크립트
+# Seaborn 정적 차트, Plotly 인터랙티브 차트 생성
 #====================================================================
 
 import os
 import logging
 from datetime import datetime
 from src.clean import compare_loading, perform_basic_eda, clean_data
+from src.visualization import (
+    create_plotly_distance_chart,
+    create_seaborn_hourly_chart,
+    prepare_visualization_data,
+)
 
 def setup_logger():
     """
@@ -28,7 +34,7 @@ def setup_logger():
     return logging.getLogger(__name__)
 
 # 파일 경로 설정 (상대 경로)
-RAW_DATA_PATH = os.path.join('data', 'raw', 'yellow_tripdata_2026-05.parquet')
+RAW_DATA_PATH = os.path.join('data', 'yellow_tripdata_2026-05.parquet')
 PROCESSED_DATA_PATH = os.path.join('data', 'processed', 'cleaned_taxi_data.parquet')
 
 def main():
@@ -50,6 +56,26 @@ def main():
         df_cleaned.to_parquet(PROCESSED_DATA_PATH, index=False)
         
         logger.info(f"\n✅ 데이터 준비 완료! 정제된 파일 저장 위치: '{PROCESSED_DATA_PATH}'")
+
+        # 5. 시각화용 데이터 준비
+        visualization_df = prepare_visualization_data(df_cleaned)
+
+        # 6. Seaborn 정적 차트 생성
+        seaborn_output_path = create_seaborn_hourly_chart(
+            visualization_df
+        )
+
+        # 7. Plotly 인터랙티브 차트 생성
+        plotly_output_path = create_plotly_distance_chart(
+            visualization_df
+        )
+
+        logger.info(
+            f"✅ Seaborn 정적 차트 저장 위치: '{seaborn_output_path}'"
+        )
+        logger.info(
+            f"✅ Plotly 인터랙티브 차트 저장 위치: '{plotly_output_path}'"
+        )
         
     except Exception as e:
         logger.error(f"❌ [파이프라인 오류 발생]: {e}", exc_info=True)
