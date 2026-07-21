@@ -15,6 +15,7 @@ from src.visualization import (
     create_seaborn_hourly_chart,
     prepare_visualization_data,
 )
+from src.ml_pipeline import train_evaluate_and_save_model
 from src.analysis import (
     compute_descriptive_stats,
     compute_correlation_matrix,
@@ -43,6 +44,7 @@ def setup_logger():
 # 파일 경로 설정 (상대 경로)
 RAW_DATA_PATH = os.path.join('data', 'raw', 'yellow_tripdata_2026-05.parquet')
 PROCESSED_DATA_PATH = os.path.join('data', 'processed', 'cleaned_taxi_data.parquet')
+MODEL_PATH = os.path.join('models', 'taxi_classifier_pipeline.joblib')
 
 def main():
     logger = setup_logger()
@@ -61,8 +63,7 @@ def main():
         # 4. 정제 완료 데이터 저장 (data/processed/)
         os.makedirs(os.path.dirname(PROCESSED_DATA_PATH), exist_ok=True)
         df_cleaned.to_parquet(PROCESSED_DATA_PATH, index=False)
-        
-        logger.info(f"\n✅ 데이터 준비 완료! 정제된 파일 저장 위치: '{PROCESSED_DATA_PATH}'")
+
 
         # 5. 시각화용 데이터 준비
         visualization_df = prepare_visualization_data(df_cleaned)
@@ -90,6 +91,12 @@ def main():
 
         # 9. 결제수단별 총요금 t-검정 및 p-value 해석
         run_payment_type_ttest(df_cleaned)
+
+        # 10. sklearn Pipeline 기반 전처리 + 모델 학습 + 평가 + 저장
+        train_evaluate_and_save_model(df_cleaned, MODEL_PATH)
+        
+        logger.info(f"\n✅ 데이터 준비 완료! 정제된 파일 저장 위치: '{PROCESSED_DATA_PATH}'")
+        logger.info(f"✅ 학습 모델 저장 위치: '{MODEL_PATH}'")
 
     except Exception as e:
         logger.error(f"❌ [파이프라인 오류 발생]: {e}", exc_info=True)
