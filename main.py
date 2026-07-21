@@ -2,6 +2,8 @@
 # 작성자: 김용찬, 김아영, 오영현
 # 작성목적: 데이터 준비 + 시각화 + 통계 분석 파이프라인 자동 실행 및 로깅 스크립트
 # Seaborn 정적 차트, Plotly 인터랙티브 차트 생성
+# 변경사항 내역:
+# - 2026-07-21, 결제수단별 총요금 t-test 파이프라인 단계([9]) 연결
 #====================================================================
 
 import os
@@ -16,6 +18,7 @@ from src.visualization import (
 from src.analysis import (
     compute_descriptive_stats,
     compute_correlation_matrix,
+    run_payment_type_ttest,
 )
 
 def setup_logger():
@@ -84,7 +87,10 @@ def main():
         # 8. 기술통계 및 상관계수 계산
         compute_descriptive_stats(df_cleaned)
         compute_correlation_matrix(df_cleaned)
-        
+
+        # 9. 결제수단별 총요금 t-검정 및 p-value 해석
+        run_payment_type_ttest(df_cleaned)
+
     except Exception as e:
         logger.error(f"❌ [파이프라인 오류 발생]: {e}", exc_info=True)
 
