@@ -9,7 +9,7 @@ packaging==26.2
 pandas==3.0.3
 pillow==12.3.0
 plotly==6.9.0
-polars==1.43.0
+polars==1.43.0  
 polars-runtime-32==1.43.0
 pyarrow==25.0.0
 pyparsing==3.3.2
