@@ -8,6 +8,10 @@
 # 변경사항 내역:
 # - 2026-07-21, 최초 작성
 # - 2026-07-21, 결제수단(신용카드 vs 현금)별 총요금 t-test(scipy.stats.ttest_ind) 및 p-value 해석 추가
+# - 2026-07-21, run_payment_type_ttest()가 (t_stat, p_value) 튜플만 반환하던 것을
+#               report.md 자동 생성에서 그대로 활용할 수 있도록 t_stat/p_value/
+#               interpretation(해석 문장)을 담은 dict로 반환하도록 변경
+#               (기존 로그 출력·해석 로직은 그대로 유지, 반환 형태만 확장)
 #====================================================================
 
 import logging
@@ -49,10 +53,10 @@ def compute_descriptive_stats(df: pd.DataFrame, numeric_columns: list = None) ->
         logger.error(f"기술통계 계산에 필요한 컬럼이 없습니다: {missing_cols}")
         raise ValueError(f"기술통계 계산에 필요한 컬럼이 없습니다: {missing_cols}")
 
-    stats = df[numeric_columns].describe()
-    logger.info(f"▶ 기술통계 결과:\n{stats}")
+    stats_result = df[numeric_columns].describe()
+    logger.info(f"▶ 기술통계 결과:\n{stats_result}")
 
-    return stats
+    return stats_result
 
 
 def compute_correlation_matrix(df: pd.DataFrame, numeric_columns: list = None) -> pd.DataFrame:
@@ -98,7 +102,7 @@ N_REPEATS = 10
 RANDOM_SEED = 42
 
 
-def run_payment_type_ttest(df: pd.DataFrame, value_column: str = "total_amount"):
+def run_payment_type_ttest(df: pd.DataFrame, value_column: str = "total_amount") -> dict:
     """
     [함수 설명] 결제수단(신용카드 vs 현금)에 따라 총요금(total_amount) 평균이
     통계적으로 유의하게 다른지 scipy.stats.ttest_ind로 독립표본 t-검정을 수행하고,
@@ -107,6 +111,9 @@ def run_payment_type_ttest(df: pd.DataFrame, value_column: str = "total_amount")
     - 귀무가설(H0): 두 결제수단의 평균 총요금은 같다.
     - 대립가설(H1): 두 결제수단의 평균 총요금은 다르다. (양측검정)
     - 두 그룹의 분산이 다를 수 있으므로 equal_var=False(Welch's t-test)를 사용한다.
+
+    반환값(dict)에는 t_stat/p_value 외에 report.md 자동 생성에서 그대로 쓸 수
+    있도록 해석 문장(interpretation)과 그룹별 평균도 함께 담는다.
     """
     logger.info("=" * 60)
     logger.info(" [9] 독립표본 t-검정 (결제수단별 총요금 차이)")
@@ -138,22 +145,39 @@ def run_payment_type_ttest(df: pd.DataFrame, value_column: str = "total_amount")
     logger.info(f"▶ p-value: {p_value:.6f}")
 
     # p-value 해석: 유의수준(ALPHA)과 비교해 귀무가설 기각 여부를 문장으로 남긴다.
-    if p_value < ALPHA:
+    is_significant = p_value < ALPHA
+    if is_significant:
         higher = "신용카드" if card.mean() > cash.mean() else "현금"
+        interpretation = (
+            f"p-value({p_value:.6f}) < α({ALPHA}) → 귀무가설 기각. "
+            f"두 결제수단의 평균 총요금은 통계적으로 유의미한 차이가 있으며, "
+            f"평균적으로 '{higher}' 결제 트립의 총요금이 더 높다."
+        )
         logger.info(f"💡 결론: p-value({p_value:.6f}) < α({ALPHA}) → 귀무가설 기각")
         logger.info("   두 결제수단의 평균 총요금은 '통계적으로 유의미한 차이'가 있다.")
         logger.info(f"   → 평균적으로 '{higher}' 결제 트립의 총요금이 더 높다.")
     else:
+        interpretation = (
+            f"p-value({p_value:.6f}) >= α({ALPHA}) → 귀무가설 기각 실패. "
+            f"두 결제수단의 평균 총요금 차이는 통계적으로 유의하지 않다."
+        )
         logger.info(f"💡 결론: p-value({p_value:.6f}) ≥ α({ALPHA}) → 귀무가설 기각 실패")
         logger.info("   두 결제수단의 평균 총요금 차이는 '통계적으로 유의하지 않다'.")
 
     # p-value 해석의 연장선: 표본 크기(n)를 늘려가며 p-value가 어떻게 변하는지 실험한다.
     run_sample_size_experiment(card, cash)
 
-    return t_stat, p_value
+    return {
+        "t_stat": t_stat,
+        "p_value": p_value,
+        "is_significant": is_significant,
+        "interpretation": interpretation,
+        "card_mean": card.mean(),
+        "cash_mean": cash.mean(),
+    }
 
 
-def run_sample_size_experiment(card: pd.Series, cash: pd.Series):
+def run_sample_size_experiment(card: pd.Series, cash: pd.Series) -> None:
     """
     [함수 설명] 같은 두 집단에서 표본 크기(n)만 10 → 100 → 1000 …으로 늘려가며
     평균 p-value가 어떻게 변하는지 보여주는 실험이다.
@@ -172,7 +196,6 @@ def run_sample_size_experiment(card: pd.Series, cash: pd.Series):
     logger.info("   (평균 차이는 그대로여도 n이 커지면 p-value가 작아지는지 확인)")
 
     rng = random.Random(RANDOM_SEED)
-    # 표頭
     logger.info(f"   {'표본크기 n':>10} | {'평균 p-value':>14} | {'유의(p<0.05) 비율':>16} | {'평균 t':>10}")
     logger.info(f"   {'-'*10} | {'-'*14} | {'-'*16} | {'-'*10}")
 

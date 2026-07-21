@@ -47,7 +47,7 @@ def compare_loading(file_path: str):
     diff_ratio = abs(pd_time - pl_time) / max(pd_time, pl_time) * 100
     logger.info(f"💡 결론: {faster}가 약 {diff_ratio:.1f}% 더 빠르게 대용량 데이터를 처리했습니다.\n")
     
-    return df_pd, df_pl
+    return df_pd, df_pl, pd_time, pl_time
 
 def perform_basic_eda(df: pd.DataFrame):
     """

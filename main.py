@@ -1,9 +1,13 @@
 #====================================================================
-# 작성자: 김용찬, 김아영, 오영현
-# 작성목적: 데이터 준비 + 시각화 + 통계 분석 파이프라인 자동 실행 및 로깅 스크립트
-# Seaborn 정적 차트, Plotly 인터랙티브 차트 생성
+# 작성자: 김용찬, 김아영, 오영현, 정구현, 이효빈, 김세빈
+# 작성목적: 데이터 준비 + 시각화 + 통계 분석 + ML Pipeline + report.md
+#           자동생성까지 전체 파이프라인을 실행하고 로깅하는 스크립트
 # 변경사항 내역:
 # - 2026-07-21, 결제수단별 총요금 t-test 파이프라인 단계([9]) 연결
+# - 2026-07-21, report.md 자동 생성 단계([11])를 main.py에 연결
+#               (compare_loading의 로딩 시간, clean_data 전후 행 수,
+#                기술통계·상관계수·t-test·ML Pipeline 결과를 전부 받아
+#                report_generator.generate_report_md()로 전달)
 #====================================================================
 
 import os
@@ -21,6 +25,7 @@ from src.analysis import (
     compute_correlation_matrix,
     run_payment_type_ttest,
 )
+from src.report_generator import generate_report_md
 
 def setup_logger():
     """
@@ -52,13 +57,15 @@ def main():
     
     try:
         # 1. Pandas vs Polars 속도 비교 로딩
-        df_pd, _ = compare_loading(RAW_DATA_PATH)
-        
+        df_pd, _, pandas_time, polars_time = compare_loading(RAW_DATA_PATH)
+        initial_rows = len(df_pd)
+
         # 2. 기초 EDA 수행
         perform_basic_eda(df_pd)
         
         # 3. 데이터 정제 (결측치/중복/이상치 처리)
         df_cleaned = clean_data(df_pd)
+        final_rows = len(df_cleaned)
         
         # 4. 정제 완료 데이터 저장 (data/processed/)
         os.makedirs(os.path.dirname(PROCESSED_DATA_PATH), exist_ok=True)
@@ -86,17 +93,32 @@ def main():
         )
 
         # 8. 기술통계 및 상관계수 계산
-        compute_descriptive_stats(df_cleaned)
-        compute_correlation_matrix(df_cleaned)
+        stats_result = compute_descriptive_stats(df_cleaned)
+        corr_result = compute_correlation_matrix(df_cleaned)
 
         # 9. 결제수단별 총요금 t-검정 및 p-value 해석
-        run_payment_type_ttest(df_cleaned)
+        ttest_result = run_payment_type_ttest(df_cleaned)
 
         # 10. sklearn Pipeline 기반 전처리 + 모델 학습 + 평가 + 저장
-        train_evaluate_and_save_model(df_cleaned, MODEL_PATH)
+        pipeline_metrics = train_evaluate_and_save_model(df_cleaned, MODEL_PATH)
         
         logger.info(f"\n✅ 데이터 준비 완료! 정제된 파일 저장 위치: '{PROCESSED_DATA_PATH}'")
         logger.info(f"✅ 학습 모델 저장 위치: '{MODEL_PATH}'")
+
+        # 11. report.md 자동 생성 (Jinja2)
+        generate_report_md(
+            pandas_time=pandas_time,
+            polars_time=polars_time,
+            initial_rows=initial_rows,
+            final_rows=final_rows,
+            seaborn_chart_path=str(seaborn_output_path),
+            plotly_chart_path=str(plotly_output_path),
+            descriptive_stats=stats_result,
+            correlation_matrix=corr_result,
+            ttest_result=ttest_result,
+            pipeline_metrics=pipeline_metrics,
+            model_path=MODEL_PATH,
+        )
 
     except Exception as e:
         logger.error(f"❌ [파이프라인 오류 발생]: {e}", exc_info=True)
