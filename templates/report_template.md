@@ -1,0 +1,51 @@
+# 🚕 NYC Yellow Taxi 데이터 분석 최종 보고서
+
+**보고서 생성 일시:** {{ generated_date }}
+
+---
+
+## 1. 🚀 데이터 준비 및 로딩 성능
+- **Pandas 로딩 시간:** {{ pandas_time }}초
+- **Polars 로딩 시간:** {{ polars_time }}초
+- **데이터 정제 결과:** {{ initial_rows }}행 $\rightarrow$ {{ final_rows }}행 (총 {{ removed_rows }}건 제거)
+
+---
+
+## 2. 📊 기술통계 및 상관관계
+### 주요 수치 요약
+{{ descriptive_stats }}
+
+### 변수 간 상관계수
+{{ correlation_matrix }}
+
+---
+
+## 3. 📈 데이터 시각화 결과
+
+### 🕒 시간대별 운행 건수 (Seaborn 정적 차트)
+![시간대별 분포](./{{ seaborn_chart_path }})
+
+### 📍 거리 vs 요금 관계 (Plotly 인터랙티브 차트)
+[👉 인터랙티브 차트 확인하기]({{ plotly_chart_path }})
+
+---
+
+## 4. 🧪 통계 검정 (t-test)
+**주제: 결제 수단별 총 요금 차이 검정**
+
+- **t-통계량:** {{ t_stat }}
+- **p-value:** {{ p_val }}
+- **최종 해석:** {{ t_test_interpretation }}
+
+---
+
+## 5. 🤖 머신러닝 모델링 (ML Pipeline)
+### 모델 성능 결과
+- **모델 종류:** Ridge Regression Pipeline
+- **R2 Score (결정계수):** {{ model_score }}
+
+### 모델 저장 정보
+- **저장 경로:** `{{ model_path }}`
+
+---
+*본 보고서는 데이터 분석 파이프라인에 의해 자동으로 생성되었습니다.*
